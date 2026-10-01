@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThawClock - When to start thawing</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background:#0f1e2b; color:#e6f1f8; line-height:1.5; }
+  .wrap { max-width:680px; margin:0 auto; padding:26px 18px 60px; }
+  a { color:#7fd3f0; } h1 { font-size:28px; } h1 span { color:#7fd3f0; } .sub { color:#9db6c6; margin:4px 0 18px; }
+  .card { background:#17303f; border-radius:14px; padding:16px; margin-bottom:14px; }
+  label { display:block; font-size:13px; color:#9db6c6; margin:10px 0 4px; }
+  input, select { width:100%; padding:11px; border-radius:9px; border:1px solid #2c4a5d; background:#0f1e2b; color:#e6f1f8; font-size:16px; }
+  .row { display:flex; gap:10px; } .row > div { flex:1; }
+  .seg { display:flex; gap:8px; } .seg button { flex:1; padding:11px; border-radius:9px; border:1px solid #2c4a5d; background:#0f1e2b; color:#9db6c6; font-size:15px; cursor:pointer; }
+  .seg button.on { background:#7fd3f0; color:#0f1e2b; font-weight:700; border-color:#7fd3f0; }
+  .big { font-size:30px; font-weight:800; color:#7fd3f0; } .lbl { font-size:13px; color:#9db6c6; }
+  .grid { display:flex; gap:14px; flex-wrap:wrap; } .grid > div { flex:1; min-width:180px; }
+  .warn { background:#4a2a1f; border:1px solid #c0623f; color:#ffd6c4; padding:12px; border-radius:10px; margin-top:12px; }
+  .ok { background:#17402f; border:1px solid #3f9c6e; color:#cdf3de; padding:12px; border-radius:10px; margin-top:12px; }
+  .note { font-size:13px; color:#9db6c6; margin-top:10px; } h2 { font-size:17px; margin-bottom:6px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; } td, th { padding:6px 4px; border-bottom:1px solid #26414f; text-align:left; } th { color:#9db6c6; font-weight:600; }
+  ol { margin:6px 0 0 20px; color:#c6dae6; } li { margin-bottom:4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Thaw<span>Clock</span></h1>
+  <div class="sub">Tell it when you want to cook. It tells you when to take the food out of the freezer.</div>
+  <div class="card">
+    <label>What are you thawing?</label>
+    <div class="seg" id="kind"><button data-v="turkey" class="on">Whole turkey</button><button data-v="other">Other meat or poultry</button></div>
+    <div class="row"><div><label for="w">Weight</label><input id="w" type="number" min="0.1" step="0.1" value="14"></div>
+    <div><label for="u">Unit</label><select id="u"><option value="lb">pounds</option><option value="kg">kilograms</option></select></div></div>
+    <label>Method</label>
+    <div class="seg" id="method"><button data-v="fridge" class="on">Refrigerator</button><button data-v="cold">Cold water</button></div>
+    <label for="cook">I want to start cooking</label>
+    <input id="cook" type="datetime-local">
+  </div>
+  <div class="card" id="plan"></div>
+  <div class="card" id="steps"></div>
+  <div class="card">
+    <h2>Left it on the counter?</h2>
+    <div class="row"><div><label for="hrs">Hours out of the fridge</label><input id="hrs" type="number" min="0" step="0.25" value="1.5"></div>
+    <div><label for="tmp">Room temperature (&deg;F)</label><input id="tmp" type="number" step="1" value="70"></div></div>
+    <div id="counter"></div>
+  </div>
+  <div class="card"><h2>USDA turkey thawing times</h2>
+    <table><tr><th>Weight</th><th>Refrigerator</th><th>Cold water</th></tr>
+    <tr><td>4 to 12 lb</td><td>1 to 3 days</td><td>2 to 6 hours</td></tr>
+    <tr><td>12 to 16 lb</td><td>3 to 4 days</td><td>6 to 8 hours</td></tr>
+    <tr><td>16 to 20 lb</td><td>4 to 5 days</td><td>8 to 10 hours</td></tr>
+    <tr><td>20 to 24 lb</td><td>5 to 6 days</td><td>10 to 12 hours</td></tr></table>
+    <div class="note">Source: <a href="https://www.fsis.usda.gov/food-safety/safe-food-handling-and-preparation/poultry/turkey-basics-safe-thawing">USDA FSIS, Turkey Basics: Safe Thawing</a>. For other meat the app uses 24 hours per 5 lb in the fridge (at least a day), a rule of thumb. The 2 hour counter limit (1 hour above 90&deg;F) is from <a href="https://www.fsis.usda.gov/food-safety/safe-food-handling-and-preparation/food-safety-basics/steps-keep-food-safe">USDA FSIS, Steps to Keep Food Safe</a>. Never thaw on the counter. Microwave thawing: follow your oven manual and cook right away. <a href="index.html">About</a></div>
+  </div>
+</div>
+<script src="engine.js"></script>
+<script>
+var kind = 'turkey', method = 'fridge', $ = function (i) { return document.getElementById(i); };
+function pad(x) { return (x < 10 ? '0' : '') + x; }
+function loc(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+function fmt(ms) { return new Date(ms).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+function dur(min) { var h = Math.floor(min / 60), m = Math.round(min % 60); return (h ? h + ' h ' : '') + (m ? m + ' min' : (h ? '' : '0 min')); }
+var d0 = new Date(); d0.setDate(d0.getDate() + 5); d0.setHours(15, 0, 0, 0); $('cook').value = loc(d0);
+function seg(id, set) { var b = $(id).querySelectorAll('button'); for (var i = 0; i < b.length; i++) b[i].onclick = function () { for (var j = 0; j < b.length; j++) b[j].className = ''; this.className = 'on'; set(this.getAttribute('data-v')); render(); }; }
+seg('kind', function (v) { kind = v; }); seg('method', function (v) { method = v; });
+function render() {
+  var w = parseFloat($('w').value), cookAt = new Date($('cook').value).getTime();
+  if (!(w > 0) || isNaN(cookAt)) { $('plan').innerHTML = '<div class="lbl">Enter a weight and a cooking time.</div>'; $('steps').innerHTML = ''; }
+  else {
+    var lb = Thaw.toLb(w, $('u').value), p = Thaw.plan(cookAt, method, lb, kind), h = '', now = Date.now(), st = '';
+    h += '<div class="lbl">' + lb.toFixed(1) + ' lb (' + Thaw.toKg(lb).toFixed(1) + ' kg)</div>';
+    if (method === 'fridge') {
+      var days = p.days.lo === p.days.hi ? p.days.hi + ' day' + (p.days.hi > 1 ? 's' : '') : p.days.lo + ' to ' + p.days.hi + ' days';
+      h += '<div class="grid"><div><div class="lbl">Start thawing no later than</div><div class="big" id="latest">' + fmt(p.startLatest) + '</div></div><div><div class="lbl">Thaw time in the fridge</div><div class="big">' + days + '</div></div></div>';
+      if (p.startEarliest != null && p.days.hi >= p.days.lo) h += '<div class="note">Thawed food keeps 1 to 2 days in the fridge, so starting before ' + fmt(p.startEarliest) + ' is too early.' + (p.days.lo === p.days.hi ? ' (Fridge range counted from the lower thaw time.)' : '') + '</div>';
+      if (p.extrapolated) h += '<div class="warn">Over 24 lb is past the USDA table. This range extends it with 24 hours per 4 to 5 lb.</div>';
+      if (p.startLatest < now) h += '<div class="warn" id="late">That start time has already passed. Use the cold water method, or move your cooking time later.</div>';
+      st = '<h2>Fridge steps</h2><ol><li>Keep it in the wrapper on a tray or in a container so juices do not drip on other food.</li><li>Fridge at 40&deg;F (4&deg;C) or below.</li><li>Cook within 1 to 2 days after it is thawed. It is safe to refreeze uncooked.</li></ol>';
+    } else {
+      h += '<div class="grid"><div><div class="lbl">Start no later than</div><div class="big" id="latest">' + fmt(p.startLatest) + '</div></div><div><div class="lbl">Thaw time in cold water</div><div class="big">' + dur(p.minutes) + '</div></div></div>';
+      var b = Thaw.coldBand(lb);
+      if (b && kind === 'turkey') h += '<div class="note">USDA lists ' + b.lo + ' to ' + b.hi + ' hours for this size. This plan uses the full 30 minutes per pound.</div>';
+      if (p.startLatest < now) h += '<div class="warn" id="late">That start time has already passed. Move your cooking time later.</div>';
+      st = '<h2>Cold water steps</h2><ol><li>Keep it in a leak-proof bag so it does not take on water or spread germs.</li><li>Submerge it in cold tap water and change the water every 30 minutes (about ' + p.changes + ' changes).</li><li>Cook it right after it is thawed. Do not refreeze raw, cook first.</li></ol>';
+    }
+    $('plan').innerHTML = h; $('steps').innerHTML = st;
+  }
+  var hrs = parseFloat($('hrs').value), t = parseFloat($('tmp').value);
+  if (isNaN(hrs) || isNaN(t)) $('counter').innerHTML = ''; else {
+    var c = Thaw.counterCheck(hrs, t);
+    $('counter').innerHTML = c.status === 'over' ? '<div class="warn" id="over">Past the limit: more than ' + c.limit + ' hour' + (c.limit > 1 ? 's' : '') + ' at this temperature. Do not leave it out to finish thawing. When in doubt, throw it out.</div>' : '<div class="ok" id="underok">Within the ' + c.limit + ' hour limit, about ' + dur(c.left * 60) + ' left. Move it to the fridge or a cold water bath now.</div>';
+  }
+}
+['w', 'u', 'cook', 'hrs', 'tmp'].forEach(function (i) { $(i).oninput = render; $(i).onchange = render; });
+render();
+</script>
+</body>
+</html>
